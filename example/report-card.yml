@@ -1,0 +1,31 @@
+---
+Version: "1.2.3"
+Checks:
+  "Verify foo.txt exists":
+    Type: CheckFileExists
+    Config:
+      Path: "foo.txt"
+  "Verify bar.txt exists":
+    Type: CheckFileExists
+    Config:
+      Path: "foo.txt"
+  "Verify golang.mk uses latest version":
+    Type: CheckFileMD5
+    Config:
+      Path: "foo.txt"
+      Hash: "12345"
+  "Verify no blacklisted package.json deps":
+    Type: CheckNodeDependencies
+    Config:
+      Blacklist:
+        - "foo"
+        - "oauth"
+        - "babel-cli"
+  "Verify uses a whitelisted Docker base image":
+    Type: CheckDockerBaseImage
+    Config:
+      Whitelist:
+        - "nodejs:foo"
+        - "golang:bar"
+        - "golang:baz"
+        - "alpine"

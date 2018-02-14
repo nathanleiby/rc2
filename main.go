@@ -7,11 +7,13 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/go-yaml/yaml"
 )
 
 func main() {
 	// Read a config file
-	config, err := readConfig("report-card.yml")
+	config, err := readReportCardConfig("report-card.yml")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,52 +48,33 @@ func computeScore(results map[string]Result) float64 {
 }
 
 type ConfigCheck struct {
-	Type   string
-	Config interface{} // Will need different configuration depending on check type
+	Type   string                 `yaml:"Type"`
+	Config map[string]interface{} `yaml:"Config"` // Will need different configuration depending on check type
 }
 
-type Config struct {
-	Version string
-	Checks  map[string]Check
+type ReportCardConfig struct {
+	Version string                 `yaml:"Version"`
+	Checks  map[string]ConfigCheck `yaml:"Checks"`
 }
 
-func readConfig(path string) (Config, error) {
+func readReportCardConfig(path string) (ReportCardConfig, error) {
 	// open file at path
 	// TODO
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return ReportCardConfig{}, err
+	}
 
 	// parse checks
-	// TODO
+	conf := ReportCardConfig{}
+
+	err = yaml.Unmarshal(data, &conf)
+	if err != nil {
+		return ReportCardConfig{}, err
+	}
 
 	// validate checks (e.g. perhaps a check takes a whitelist or blacklist, but not both)
 	// TODO
-
-	// For now, use a mock config
-	conf := Config{
-		Version: "1.2.3",
-		Checks: map[string]Check{
-			"Verify foo.txt exists": &CheckFileExists{
-				Path: "foo.txt",
-			},
-			"Verify bar.txt exists": &CheckFileExists{
-				Path: "bar.txt",
-			},
-			"Verify no blacklisted package.json deps": &CheckNodeDependencies{
-				Blacklist: []string{
-					"foo",
-					"oauth",
-					"babel-cli",
-				},
-			},
-			"Verify uses a whitelisted Docker base image": &CheckDockerBaseImage{
-				Whitelist: []string{
-					"nodejs:foo",
-					"golang:bar",
-					"golang:baz",
-					"alpine",
-				},
-			},
-		},
-	}
 
 	return conf, nil
 }
@@ -101,11 +84,46 @@ func readConfig(path string) (Config, error) {
 //- warning
 //- failure
 
-func runChecks(conf Config) (map[string]Result, error) {
+func runChecks(conf ReportCardConfig) (map[string]Result, error) {
 	// TODO: parallelize
 	results := map[string]Result{}
 	for title, c := range conf.Checks {
-		r, err := c.Execute()
+		var check Check
+		switch c.Type {
+		case "CheckFileExists":
+			// TODO: check for errors instead of type assertion, since this is user config
+			// Maybe: do a bunch of validation upfront?
+			check = &CheckFileExists{
+				Path: c.Config["Path"].(string),
+			}
+		case "CheckFileMD5":
+			check = &CheckFileMD5{
+				Path: c.Config["Path"].(string),
+				Hash: c.Config["Hash"].(string),
+			}
+		case "CheckNodeDependencies":
+			blacklist := []string{}
+			for _, item := range c.Config["Blacklist"].([]interface{}) {
+				blacklist = append(blacklist, item.(string))
+			}
+			check = &CheckNodeDependencies{
+				Blacklist: blacklist,
+			}
+		case "CheckDockerBaseImage":
+			whitelist := []string{}
+			for _, item := range c.Config["Whitelist"].([]interface{}) {
+				whitelist = append(whitelist, item.(string))
+			}
+			check = &CheckDockerBaseImage{
+				Whitelist: whitelist,
+			}
+		default:
+			fmt.Printf("skipping %s...\n", title)
+			continue
+		}
+
+		// Do whatever
+		r, err := check.Execute()
 		if err != nil {
 			return nil, err
 		}
@@ -165,10 +183,6 @@ func (c *CheckNodeDependencies) Execute() (Result, error) {
 	}, nil
 }
 
-type CheckFileExists struct {
-	Path string
-}
-
 type CheckDockerBaseImage struct {
 	Whitelist []string
 }
@@ -205,7 +219,32 @@ func (c *CheckDockerBaseImage) Execute() (Result, error) {
 	}, nil
 }
 
+type CheckFileExists struct {
+	Path string
+}
+
 func (c *CheckFileExists) Execute() (Result, error) {
+	_, err := os.Stat(c.Path)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return Result{
+				Outcome: "failure",
+			}, nil
+		}
+		return Result{}, err
+	}
+
+	return Result{
+		Outcome: "success",
+	}, nil
+}
+
+type CheckFileMD5 struct {
+	Path string
+	Hash string
+}
+
+func (c *CheckFileMD5) Execute() (Result, error) {
 	_, err := os.Stat(c.Path)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such file") {
