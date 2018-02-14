@@ -7,11 +7,17 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"strings"
 
 	"github.com/go-yaml/yaml"
 )
+
+type Output struct {
+	Score   float64           `json:"score"`
+	Results map[string]Result `json:"results"`
+}
 
 func main() {
 	// TODO: allow passing in workdir
@@ -33,16 +39,22 @@ func main() {
 		log.Fatal(err)
 	}
 
+	output := Output{
+		Score:   computeScore(results),
+		Results: results,
+	}
+
 	// Print results
-	out, err := json.MarshalIndent(results, "", "    ")
+	out, err := json.MarshalIndent(output, "", "    ")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Compute score
-	score := computeScore(results)
 	fmt.Println(string(out))
-	fmt.Printf("Score = %.1f%%\n", score)
+}
+
+func round(f float64) float64 {
+	return math.Floor(f + .5)
 }
 
 func computeScore(results map[string]Result) float64 {
@@ -53,7 +65,8 @@ func computeScore(results map[string]Result) float64 {
 		}
 	}
 
-	return (1 - float64(failures)/float64(len(results))) * 100
+	score := (1 - float64(failures)/float64(len(results))) * 100
+	return round(score)
 }
 
 type ConfigCheck struct {

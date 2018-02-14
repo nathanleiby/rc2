@@ -30,7 +30,4 @@ Checks:
     Type: CheckDockerBaseImage
     Config:
       Whitelist:
-        - "nodejs:foo"
-        - "golang:bar"
-        - "golang:baz"
-        - "alpine"
+        - "alpine:3.4" # ebs-snapshots
