@@ -1,33 +1,42 @@
 ---
 Version: "1.2.3" # report-card version
 Checks:
-  "Verify foo.txt exists":
+  "foo.txt exists":
     Type: CheckFileExists
     Config:
       Path: "foo.txt"
-  "Verify bar.txt exists":
+  "bar.txt exists":
     Type: CheckFileExists
     Config:
       Path: "foo.txt"
-  "Verify golang.mk file hash":
+  "golang.mk file hash":
     Type: CheckFileMD5
     Config:
       Path: "golang.mk"
       Hash: "be912d389abdbe8ed9b0695f67864b4b"
-  "Verify golang.mk is up-to-date":
+  "golang.mk is up-to-date":
     Type: CheckFileHasString
     Config:
       Path: "golang.mk"
       String: "0.3.3"
-  "Verify no blacklisted package.json deps":
+  "no blacklisted package.json deps":
     Type: CheckNodeDependencies
     Config:
       Blacklist:
         - "foo"
         - "oauth"
         - "babel-cli"
-  "Verify uses a whitelisted Docker base image":
+  "uses a whitelisted Docker base image":
     Type: CheckDockerBaseImage
     Config:
       Whitelist:
         - "alpine:3.4" # ebs-snapshots
+  "foo.txt is JSON":
+    Type: CheckFileIsValidJSON
+    Config:
+      Path: "foo.txt"
+  "person.json is valid":
+    Type: CheckFileHasJSONSchema
+    Config:
+      Path: "person.json"
+      Schema: "schema.json"

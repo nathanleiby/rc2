@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type Check interface {
@@ -179,4 +181,87 @@ func (c *CheckFileHasString) Execute() (Result, error) {
 	return Result{
 		Outcome: "failure",
 	}, nil
+}
+
+type CheckFileIsValidJSON struct {
+	Path string
+}
+
+func (c *CheckFileIsValidJSON) Execute() (Result, error) {
+	b, err := ioutil.ReadFile(c.Path)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return Result{
+				Outcome: "failure",
+				Details: "no such file",
+			}, nil
+		}
+		return Result{}, err
+	}
+
+	var js map[string]interface{}
+	err = json.Unmarshal(b, &js)
+	if err == nil {
+		return Result{
+			Outcome: "success",
+		}, nil
+	}
+
+	return Result{
+		Outcome: "failure",
+		Details: "file is not valid JSON",
+	}, nil
+}
+
+type CheckFileHasJSONSchema struct {
+	Path       string
+	SchemaPath string
+}
+
+func (c *CheckFileHasJSONSchema) Execute() (Result, error) {
+	b, err := ioutil.ReadFile(c.Path)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return Result{
+				Outcome: "failure",
+				Details: "no such file",
+			}, nil
+		}
+		return Result{}, err
+	}
+	documentLoader := gojsonschema.NewStringLoader(string(b))
+
+	b, err = ioutil.ReadFile(c.SchemaPath)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return Result{
+				Outcome: "failure",
+				Details: "no such file",
+			}, nil
+		}
+		return Result{}, err
+	}
+	schemaLoader := gojsonschema.NewStringLoader(string(b))
+
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		fmt.Println(err)
+		panic(err.Error())
+	}
+
+	if result.Valid() {
+		return Result{
+			Outcome: "success",
+		}, nil
+	} else {
+		errDetails := []string{}
+		for _, desc := range result.Errors() {
+			errDetails = append(errDetails, desc.String())
+		}
+		return Result{
+			Outcome: "failure",
+			Details: strings.Join(errDetails, " | "),
+		}, nil
+	}
+
 }

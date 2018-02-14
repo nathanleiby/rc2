@@ -127,6 +127,15 @@ func runChecks(conf ReportCardConfig) (map[string]Result, error) {
 				Path:   c.Config["Path"].(string),
 				String: c.Config["String"].(string),
 			}
+		case "CheckFileIsValidJSON":
+			check = &CheckFileIsValidJSON{
+				Path: c.Config["Path"].(string),
+			}
+		case "CheckFileHasJSONSchema":
+			check = &CheckFileHasJSONSchema{
+				Path:       c.Config["Path"].(string),
+				SchemaPath: c.Config["Schema"].(string),
+			}
 		case "CheckNodeDependencies":
 			blacklist := []string{}
 			for _, item := range c.Config["Blacklist"].([]interface{}) {
