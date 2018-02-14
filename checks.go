@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -29,6 +30,12 @@ type CheckNodeDependencies struct {
 func (c *CheckNodeDependencies) Execute() (Result, error) {
 	data, err := ioutil.ReadFile("package.json")
 	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return Result{
+				Outcome: "failure",
+				Details: "no such file",
+			}, nil
+		}
 		return Result{}, err
 	}
 
@@ -47,6 +54,70 @@ func (c *CheckNodeDependencies) Execute() (Result, error) {
 				if _, ok = deps[black]; ok {
 					found = append(found, black)
 				}
+			}
+		}
+	}
+
+	if len(found) > 0 {
+		return Result{
+			Outcome: "failure",
+			Details: "found the following blacklisted packages: " + strings.Join(found, ","),
+		}, nil
+	}
+
+	return Result{
+		Outcome: "success",
+	}, nil
+}
+
+type rawLock struct {
+	SolveMeta solveMeta          `toml:"solve-meta"`
+	Projects  []rawLockedProject `toml:"projects"`
+}
+
+type solveMeta struct {
+	InputsDigest    string `toml:"inputs-digest"`
+	AnalyzerName    string `toml:"analyzer-name"`
+	AnalyzerVersion int    `toml:"analyzer-version"`
+	SolverName      string `toml:"solver-name"`
+	SolverVersion   int    `toml:"solver-version"`
+}
+
+type rawLockedProject struct {
+	Name     string   `toml:"name"`
+	Branch   string   `toml:"branch,omitempty"`
+	Revision string   `toml:"revision"`
+	Version  string   `toml:"version,omitempty"`
+	Source   string   `toml:"source,omitempty"`
+	Packages []string `toml:"packages"`
+}
+
+type CheckGolangDependencies struct {
+	Blacklist []string
+}
+
+func (c *CheckGolangDependencies) Execute() (Result, error) {
+	data, err := ioutil.ReadFile("Gopkg.lock")
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return Result{
+				Outcome: "failure",
+				Details: "no such file",
+			}, nil
+		}
+		return Result{}, err
+	}
+
+	var gopkgLock rawLock
+	if _, err := toml.Decode(string(data), &gopkgLock); err != nil {
+		return Result{}, err
+	}
+
+	found := []string{}
+	for _, project := range gopkgLock.Projects {
+		for _, black := range c.Blacklist {
+			if project.Name == black {
+				found = append(found, black)
 			}
 		}
 	}

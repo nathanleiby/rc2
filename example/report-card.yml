@@ -40,3 +40,10 @@ Checks:
     Config:
       Path: "person.json"
       Schema: "schema.json"
+  "valid go deps":
+    Type: CheckGolangDependencies
+    Config:
+      Blacklist:
+        - "foo"
+        - "oauth"
+        - "babel-cli"

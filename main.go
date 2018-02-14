@@ -8,7 +8,7 @@ import (
 	"math"
 	"os"
 
-	"github.com/go-yaml/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func main() {
@@ -151,6 +151,14 @@ func runChecks(conf ReportCardConfig) (map[string]Result, error) {
 			}
 			check = &CheckDockerBaseImage{
 				Whitelist: whitelist,
+			}
+		case "CheckGolangDependencies":
+			blacklist := []string{}
+			for _, item := range c.Config["Blacklist"].([]interface{}) {
+				blacklist = append(blacklist, item.(string))
+			}
+			check = &CheckGolangDependencies{
+				Blacklist: blacklist,
 			}
 		default:
 			fmt.Printf("skipping %s...\n", title)
