@@ -1,5 +1,5 @@
 ---
-Version: "1.2.3"
+Version: "1.2.3" # report-card version
 Checks:
   "Verify foo.txt exists":
     Type: CheckFileExists
@@ -9,11 +9,16 @@ Checks:
     Type: CheckFileExists
     Config:
       Path: "foo.txt"
-  "Verify golang.mk uses latest version":
+  "Verify golang.mk file hash":
     Type: CheckFileMD5
     Config:
-      Path: "foo.txt"
-      Hash: "12345"
+      Path: "golang.mk"
+      Hash: "be912d389abdbe8ed9b0695f67864b4b"
+  "Verify golang.mk is up-to-date":
+    Type: CheckFileHasString
+    Config:
+      Path: "golang.mk"
+      String: "0.3.3"
   "Verify no blacklisted package.json deps":
     Type: CheckNodeDependencies
     Config:

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,7 +14,14 @@ import (
 )
 
 func main() {
-	// Read a config file
+	// TODO: allow passing in workdir
+	err := os.Chdir("example/")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Read config file
+	// TODO: allow passing path to report-card.yml
 	config, err := readReportCardConfig("report-card.yml")
 	if err != nil {
 		log.Fatal(err)
@@ -58,8 +67,6 @@ type ReportCardConfig struct {
 }
 
 func readReportCardConfig(path string) (ReportCardConfig, error) {
-	// open file at path
-	// TODO
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return ReportCardConfig{}, err
@@ -100,6 +107,11 @@ func runChecks(conf ReportCardConfig) (map[string]Result, error) {
 			check = &CheckFileMD5{
 				Path: c.Config["Path"].(string),
 				Hash: c.Config["Hash"].(string),
+			}
+		case "CheckFileHasString":
+			check = &CheckFileHasString{
+				Path:   c.Config["Path"].(string),
+				String: c.Config["String"].(string),
 			}
 		case "CheckNodeDependencies":
 			blacklist := []string{}
@@ -245,17 +257,60 @@ type CheckFileMD5 struct {
 }
 
 func (c *CheckFileMD5) Execute() (Result, error) {
-	_, err := os.Stat(c.Path)
+	f, err := os.Open(c.Path)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such file") {
 			return Result{
 				Outcome: "failure",
+				Details: "no such file",
+			}, nil
+		}
+		return Result{}, err
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+	}
+
+	actual := fmt.Sprintf("%x", h.Sum(nil))
+	if actual == c.Hash {
+		return Result{
+			Outcome: "success",
+		}, nil
+	}
+
+	return Result{
+		Outcome: "failure",
+		Details: fmt.Sprint("actual md5 was: ", actual),
+	}, nil
+}
+
+type CheckFileHasString struct {
+	Path   string
+	String string
+}
+
+func (c *CheckFileHasString) Execute() (Result, error) {
+	b, err := ioutil.ReadFile(c.Path)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file") {
+			return Result{
+				Outcome: "failure",
+				Details: "no such file",
 			}, nil
 		}
 		return Result{}, err
 	}
 
+	if strings.Contains(string(b), c.String) {
+		return Result{
+			Outcome: "success",
+		}, nil
+	}
+
 	return Result{
-		Outcome: "success",
+		Outcome: "failure",
 	}, nil
 }
